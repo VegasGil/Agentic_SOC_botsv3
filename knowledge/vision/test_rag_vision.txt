@@ -1,0 +1,1 @@
+Si la alerta menciona "CVE" o "vulnerabilidad", enruta a KAREN. Si menciona "proceso" o "ransomware", enruta a FRIDAY. Si menciona "equipo inactivo", enruta a EDITH.

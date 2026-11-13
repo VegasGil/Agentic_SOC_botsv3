@@ -1,0 +1,5 @@
+DeviceTvmSoftwareVulnerabilities
+| where DeviceName has "<NOMBRE_DEL_EQUIPO>"
+| where VulnerabilitySeverityLevel in ("Critical", "High", "Medium")
+| project DeviceName, SoftwareName, SoftwareVendor, CveId, VulnerabilitySeverityLevel
+| take 5

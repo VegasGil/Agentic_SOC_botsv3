@@ -1,0 +1,1 @@
+Las reglas Sigma usan la clave 'detection' para definir la lógica. Si ves un campo 'CommandLine', significa que la regla está buscando procesos ejecutados desde la terminal.

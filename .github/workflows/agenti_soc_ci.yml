@@ -1,0 +1,72 @@
+name: Agentic-SOC CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # 1. Escanear código Python con Semgrep (SAST)
+  sast-semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: p/python
+        continue-on-error: true
+
+  # 2. Escanear dependencias con Trivy (SCA)
+  sca-trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+  # 3. Verificar sintaxis de Python (evita subir código roto)
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile Python files
+        run: |
+          python -m compileall .
+
+  # 4. Ejecutar Tests Unitarios con Pytest
+  test-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Instalamos las dependencias de los agentes
+          pip install -r requirements.txt
+          # Instalamos las dependencias de detección (Sigma) para que D.E.T.E.C.T.O.R. funcione
+          pip install -r requirements-detections.txt
+          # Instalamos pytest
+          pip install pytest pytest-mock
+      - name: Run Pytest
+        run: |
+          python -m pytest tests/ -v

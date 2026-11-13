@@ -1,0 +1,11 @@
+crewai
+crewai-tools
+langchain-openai
+python-dotenv
+requests
+msal
+litellm
+pytest
+pytest-mock
+python-ollama
+uvicorn

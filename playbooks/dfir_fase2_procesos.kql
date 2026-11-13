@@ -1,0 +1,6 @@
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where DeviceName has "<NOMBRE_DEL_EQUIPO>"
+| where ProcessCommandLine has "xmrig" or ProcessCommandLine has "vssadmin" or ProcessCommandLine has "shadow"
+| project Timestamp, AccountName, FileName, ProcessCommandLine
+| take 10

@@ -1,0 +1,191 @@
+title: PowerShell Ofuscado (MITRE ATT&CK)
+id: 2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e
+status: experimental
+description: Detecta PowerShell con flags de ofuscacion.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|contains:
+            - '-enc'
+            - '-encodedcommand'
+            - '-w hidden'
+            - '-nop'
+    condition: selection
+level: critical
+tags:
+    - attack.execution
+    - attack.t1059.001
+
+---
+title: Deteccion de Mimikatz
+id: a642964e-5618-4fa6-bf2b-a98c6dba52df
+status: stable
+description: Detecta Mimikatz via argumentos de linea de comandos.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|contains:
+            - 'sekurlsa::'
+            - 'kerberos::'
+            - 'lsadump::'
+            - 'crypto::'
+            - 'dpapi::'
+            - 'privilege::debug'
+    condition: selection
+level: critical
+tags:
+    - attack.credential_access
+    - attack.t1003
+
+---
+title: Creacion de Servicio Sospechoso (Persistencia)
+id: 3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f
+status: experimental
+description: Detecta creacion de servicios usando sc o New-Service.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|contains:
+            - 'sc create'
+            - 'New-Service'
+    condition: selection
+level: high
+tags:
+    - attack.persistence
+    - attack.t1543.003
+
+---
+title: Ejecucion de LOLBAS
+id: 7a4e6b3c-9f1c-4d8a-b2e5-8c3f6a9d2e1b
+status: stable
+description: Detecta herramientas legitimas usadas para fines maliciosos.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith:
+            - '\certutil.exe'
+            - '\mshta.exe'
+            - '\regsvr32.exe'
+            - '\rundll32.exe'
+            - '\bitsadmin.exe'
+    condition: selection
+level: high
+tags:
+    - attack.defense_evasion
+    - attack.t1218
+
+---
+title: Office Lanzando Interpretes de Comandos
+id: 32d0d3e2-e58d-4d41-926b-18b520b2b32d
+status: stable
+description: Detecta Office lanzando cmd o powershell (posible macro maliciosa).
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection_parent:
+        ParentImage|endswith:
+            - '\WINWORD.EXE'
+            - '\EXCEL.EXE'
+            - '\OUTLOOK.EXE'
+    selection_child:
+        Image|endswith:
+            - '\cmd.exe'
+            - '\powershell.exe'
+            - '\wscript.exe'
+    condition: selection_parent and selection_child
+level: critical
+tags:
+    - attack.execution
+    - attack.t1566
+
+---
+title: Tarea Programada Sospechosa
+id: c2f8c4e2-8e5a-4c9b-b3d6-7f2a1c5e8d9b
+status: stable
+description: Detecta creacion de tareas programadas en rutas sospechosas.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        CommandLine|contains|all:
+            - 'schtasks'
+            - '/create'
+    suspicious_paths:
+        CommandLine|contains:
+            - '\AppData\'
+            - '\Temp\'
+            - '\ProgramData\'
+    condition: selection and suspicious_paths
+level: medium
+tags:
+    - attack.persistence
+    - attack.t1053.005
+
+---
+title: WMI Ejecutando Procesos
+id: 8b3f9a1c-5d2e-4f8b-a7c6-2e1d9b4a5c3d
+status: stable
+description: Detecta procesos lanzados por WmiPrvSE.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        ParentImage|endswith: '\WmiPrvSE.exe'
+    condition: selection
+level: high
+tags:
+    - attack.lateral_movement
+    - attack.t1047
+
+---
+title: Instalación de Paquete AppX/MSIX con Full Trust
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+description: Detecta la instalación de paquetes MSIX/AppX con privilegios Full Trust.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith: '\powershell.exe'
+        CommandLine|contains|all:
+            - 'Add-AppxPackage'
+            - '-ExternalLocation'
+    condition: selection
+level: high
+tags:
+    - attack.execution
+    - attack.t1218
+    - attack.t1553.005
+
+---
+title: Instalacion de Paquete AppX/MSIX Sospechoso
+id: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+status: experimental
+description: Detecta la instalacion de paquetes MSIX/AppX con privilegios Full Trust usando PowerShell.
+logsource:
+    category: process_creation
+    product: windows
+detection:
+    selection:
+        Image|endswith: '\powershell.exe'
+        CommandLine|contains|all:
+            - 'Add-AppxPackage'
+            - '-ExternalLocation'
+    condition: selection
+level: high
+tags:
+    - attack.execution
+    - attack.t1218
+    - attack.t1553.005

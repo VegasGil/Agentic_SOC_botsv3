@@ -1,0 +1,5 @@
+DeviceNetworkEvents
+| where Timestamp > ago(7d)
+| where DeviceName has "<NOMBRE_DEL_EQUIPO>"
+| where RemotePort == 3389 or RemotePort == 445
+| project Timestamp, DeviceName, ActionType, RemoteIP, RemotePort

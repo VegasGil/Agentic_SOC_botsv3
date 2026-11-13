@@ -1,0 +1,5 @@
+DeviceLogonEvents
+| where Timestamp > ago(7d)
+| where DeviceName has "<NOMBRE_DEL_EQUIPO>"
+| project Timestamp, AccountName, ActionType, LogonType, RemoteIP
+| take 10

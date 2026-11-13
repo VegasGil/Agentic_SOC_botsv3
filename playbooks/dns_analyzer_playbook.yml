@@ -1,0 +1,10 @@
+name: "Análisis de Tráfico DNS Sospechoso"
+description: "Playbook para analizar conexiones a IPs de DNS públicas como 8.8.8.8 o dominios desconocidos."
+tactics:
+  - "Command and Control"
+  - "Exfiltration"
+kql_query: |
+  DeviceNetworkEvents
+  | where RemoteIP == "8.8.8.8" or RemoteUrl contains "dns"
+  | project Timestamp, DeviceName, RemoteIP, RemoteUrl, InitiatingProcessFileName, ActionType
+  | take 50

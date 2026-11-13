@@ -1,0 +1,10 @@
+DeviceProcessEvents
+| where Timestamp > ago(7d)
+| where DeviceName has "<NOMBRE_DEL_EQUIPO>"
+| where ProcessCommandLine has "Invoke-WebRequest" 
+   or ProcessCommandLine has "IEX" 
+   or ProcessCommandLine has "DownloadString"
+   or ProcessCommandLine has "curl" 
+   or ProcessCommandLine has "wget"
+| project Timestamp, DeviceName, AccountName, FileName, ProcessCommandLine
+| take 10

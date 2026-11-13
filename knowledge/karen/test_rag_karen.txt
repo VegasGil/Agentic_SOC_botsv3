@@ -1,0 +1,1 @@
+Política de la empresa: Las vulnerabilidades CVE con severidad CRÍTICA o que estén en el catálogo CISA KEV deben parchearse obligatoriamente en menos de 24 horas. Las de severidad MEDIA en 7 días.

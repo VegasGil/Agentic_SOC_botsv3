@@ -1,0 +1,6 @@
+DeviceNetworkEvents
+| where Timestamp > ago(7d)
+| where DeviceName has "<NOMBRE_DEL_EQUIPO>"
+| where RemotePort in (4444, 3389) or RemoteIP startswith "185."
+| project Timestamp, DeviceName, ActionType, RemoteIP, RemotePort, InitiatingProcessFileName
+| take 5

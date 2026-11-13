@@ -1,0 +1,8 @@
+services:
+  agentic-soc:
+    build: .
+    container_name: agentic-soc
+    env_file:
+      - .env.demo
+    volumes:
+      - ./data:/app/data

@@ -1,0 +1,1 @@
+Un "Equipo Zombie" es aquel que tiene actividad de red constante pero ningún usuario ha iniciado sesión en los últimos 30 días. Suele ser indicativo de un malware minero de criptomonedas.
