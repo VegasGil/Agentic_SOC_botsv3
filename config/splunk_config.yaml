@@ -1,0 +1,18 @@
+# ==========================================
+# CONFIGURACIÓN DE SPLUNK PARA EL CHAT L3
+# ==========================================
+
+# El índice que se usará si no se especifica uno en la pregunta.
+default_index: "main"
+
+# Lista de índices disponibles en este servidor.
+# Si mañana creas "soc_2026", solo agrégalo aquí.
+available_indexes:
+  - name: "main"
+    description: "Índice principal para alertas de agentes (HEC) y simulaciones."
+  - name: "botsv3"
+    description: "Dataset histórico de Splunk Boss of the SOC v3 (Ataque Frothly Inc)."
+
+# Configuración de la conexión (por si quieres mover esto del .env aquí en el futuro)
+# host: "82.70.86.75"
+# rest_port: 8090

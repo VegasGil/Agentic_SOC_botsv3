@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import yaml
 from openai import OpenAI
 from tools.splunk_reader import fetch_splunk_alerts
 from tools.defender_tool import obtener_evidencia
@@ -18,23 +19,34 @@ def cargar_config_l3():
     with open(ruta, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def cargar_config_splunk():
+    ruta = os.path.join("config", "splunk_config.yaml")
+    try:
+        with open(ruta, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+    except Exception:
+        return {"default_index": "main"}
+
 config_l3 = cargar_config_l3()
+config_splunk = cargar_config_splunk()
+default_index = config_splunk.get("default_index", "main")
+
 client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
 
 def iniciar_l3_chat():
     print("🤖 [L3 CHAT] Analista de Datos L3 en línea.")
+    print(f"💡 [Config] Índice por defecto de Splunk: {default_index}")
     print("💡 Tip: Escribe 'falexis' para el menú, o pídeme investigar una IP/URL o ver informes.")
     
     print("\n   [Sistema] Buscando alertas en Splunk...")
     
-    # 🚨 FIX: Manejo de errores si el archivo no existe
     try:
         fetch_splunk_alerts.run()
         with open("data/splunk_alerts.json", "r", encoding="utf-8") as f:
             alertas = json.load(f)
     except Exception as e:
         print(f"   ⚠️ [Aviso] No se pudieron cargar las alertas iniciales de Splunk: {e}")
-        alertas = [] # Si falla, empezamos con lista vacía para que no colapse
+        alertas = []
     
     resumen_splunk = ""
     for i, a in enumerate(alertas, 1):
