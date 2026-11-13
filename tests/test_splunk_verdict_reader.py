@@ -1,13 +1,23 @@
 import pytest
 from tools.splunk_verdict_reader import ejecutar_consulta_spl
 
-def test_ejecutar_consulta_spl_modo_demo():
-    """Verifica que el lector funcione en modo demo o devuelva datos reales de Splunk."""
-    resultado = ejecutar_consulta_spl.run(query_spl='search index=main "test"')
+def test_ejecutar_consulta_spl_mock(mocker):
+    """
+    Prueba que el lector de Splunk procese correctamente una respuesta simulada
+    (sin conectarse a Internet ni requerir credenciales reales).
+    """
+    # Simulamos la respuesta HTTP de Splunk
+    mock_post = mocker.patch("requests.post")
+    mock_post.return_value.status_code = 200
+    mock_post.return_value.raise_for_status.return_value = None
     
-    # Si está en modo demo, debe decirlo
-    if "Modo demo" in resultado:
-        assert "Modo demo" in resultado
-    # Si está conectado a Splunk real, debe devolver resultados (incluso si no encuentra nada)
-    else:
-        assert "Splunk devolvió" in resultado or "No se encontraron resultados" in resultado
+    # Simulamos el texto JSON que devolvería Splunk
+    mock_post.return_value.text = '{"result": {"_raw": "{\\"verdict\\": \\"MALICIOUS\\", \\"source_agent\\": \\"Nirvana\\"}", "_time": "2026-11-12T10:00:00Z"}}'
+
+    # Ejecutamos la función
+    resultado = ejecutar_consulta_spl.run(query_spl='search index=main "test"')
+
+    # Verificamos que el resultado contenga lo que esperamos
+    assert "Splunk devolvió 1 resultados" in resultado
+    assert "MALICIOUS" in resultado
+    assert "Nirvana" in resultado
