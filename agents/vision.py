@@ -1,8 +1,10 @@
 import os
 import json
+from datetime import datetime
 from crewai import Agent, LLM
-from crewai.knowledge.source.text_file_knowledge_source import TextFileKnowledgeSource
+from openai import OpenAI
 from tools.splunk_reader import fetch_splunk_alerts
+from tools.splunk_verdict_reader import ejecutar_consulta_spl
 
 def cargar_config():
     ruta = os.path.join("config", "vision.json")
@@ -12,147 +14,114 @@ def cargar_config():
 config = cargar_config()
 
 llm = LLM(
-    model=config["model"],
+    model=f"ollama_chat/{config['model']}",
     base_url=os.getenv("OLLAMA_URL", "http://localhost:11434"),
     temperature=config["temperature"]
 )
 
-# Creamos el agente
 vision = Agent(
     role=config["role"],
     goal=config["goal"],
     backstory=config["backstory"],
+    tools=[ejecutar_consulta_spl],
     llm=llm,
     verbose=True
 )
 print("⚡ [VISIÓN] Agente inicializado.")
 
+client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+
 # ==========================================
-# FUNCIÓN 1: PARA PRUEBAS POR TERMINAL (Con RAG)
+# FUNCIÓN 1: TRIAGE INICIAL (Con reglas del JSON)
 # ==========================================
 def ejecutar_vision(equipo: str, descripcion: str = ""):
-    print("🧠 V.I.S.I.O.N. iniciando análisis con RAG...")
+    print("🧠 V.I.S.I.O.N. iniciando análisis...")
     
-    conocimiento = ""
-    try:
-        with open("knowledge/vision/test_rag_vision.txt", "r", encoding="utf-8") as f:
-            conocimiento = f.read()
-    except FileNotFoundError:
-        pass
+    # 1. Lógica de derivación por reglas (leídas del JSON)
+    reglas = config.get("reglas_derivacion", {})
+    for agente_destino, palabras_clave in reglas.items():
+        for palabra in palabras_clave:
+            if palabra.lower() in descripcion.lower():
+                print(f"👉 [Visión] Detectado '{palabra}'. Derivando a {agente_destino}...")
+                
+                if agente_destino.upper() == "FRIDAY":
+                    from agents.friday import friday
+                    return friday.kickoff(descripcion)
+                elif agente_destino.upper() == "EDITH":
+                    from agents.edith import ejecutar_edith
+                    return ejecutar_edith(equipo)
+                elif agente_destino.upper() == "KAREN":
+                    from agents.karen import ejecutar_karen
+                    return ejecutar_karen(equipo)
 
-    from openai import OpenAI
-    client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-    
-    prompt = f"""Eres V.I.S.I.O.N., el analista de triaje del SOC.
-    Tu conocimiento dice: {conocimiento}
-    
-    El equipo afectado es {equipo}.
-    La alerta dice: "{descripcion}"
-    
-    Basándote en tu conocimiento y en la alerta, decide qué agente debe investigar:
-    - Si es un Equipo Zombie o hay tráfico inusual -> Responde: EDITH
-    - Si es un malware o ransomware -> Responde: FRIDAY
-    - Si es un tema de vulnerabilidades (CVE) -> Responde: KAREN
-    
-    Responde SOLO con la palabra (EDITH, FRIDAY o KAREN).
-    """
+    # 2. Si no hay reglas, usamos el LLM con el prompt del JSON
+    prompt_triaje = config["prompts"]["triaje"].format(equipo=equipo, descripcion=descripcion)
     
     try:
         response = client.chat.completions.create(
-            model="qwen2.5:3b",
-            messages=[{"role": "user", "content": prompt}],
+            model=config["model"],
+            messages=[{"role": "user", "content": prompt_triaje}],
             temperature=0.0
         )
-        decision_raw = response.choices[0].message.content.strip().upper()
+        decision = response.choices[0].message.content.strip().upper()
         
-        if "EDITH" in decision_raw:
-            decision = "EDITH"
-        elif "FRIDAY" in decision_raw:
-            decision = "FRIDAY"
-        elif "KAREN" in decision_raw:
-            decision = "KAREN"
+        if "EDITH" in decision:
+            from agents.edith import ejecutar_edith
+            return ejecutar_edith(equipo)
+        elif "FRIDAY" in decision:
+            from agents.friday import ejecutar_friday
+            return ejecutar_friday(equipo, descripcion)
+        elif "KAREN" in decision:
+            from agents.karen import ejecutar_karen
+            return ejecutar_karen(equipo)
         else:
-            decision = decision_raw
+            return f"⚠️ Visión no reconoció la decisión: {decision}"
     except Exception as e:
         return f"(Error Ollama): {e}"
 
-    print(f"🤖 Visión ha decidido enrutar a: {decision}")
-
-    if decision == "EDITH":
-        print("👉 Despertando a E.D.I.T.H. para Caza de Amenazas...")
-        from agents.edith import ejecutar_edith
-        return ejecutar_edith(equipo)
-        
-    elif decision == "FRIDAY":
-        print("👉 Despertando a F.R.I.D.A.Y. para DFIR...")
-        from agents.friday import ejecutar_friday
-        return ejecutar_friday(equipo, descripcion or "Alerta de Visión")
-        
-    elif decision == "KAREN":
-        print("👉 Despertando a K.A.R.E.N. para vulnerabilidades...")
-        from agents.karen import ejecutar_karen
-        return ejecutar_karen(equipo)
-        
-    else:
-        return f"⚠️ Visión no reconoció la decisión: {decision}"
-
 # ==========================================
-# FUNCIÓN 2: ORQUESTADOR PRINCIPAL (Llamado por Jarvis)
+# FUNCIÓN 2: ORQUESTADOR DINÁMICO (Busca en Splunk el equipo que le pidas)
 # ==========================================
 def vigilante_splunk(consulta_usuario: str = "¿Hay algo por ahí?"):
-    print(f"🗣️ [JARVIS AL USUARIO]: Recibido. Voy a preguntarle a Visión...")
     print(f"🗣️ [JARVIS A VISIÓN]: '{consulta_usuario}'")
     
-    from openai import OpenAI
-    client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
+    # 1. Extraemos el equipo de la consulta del usuario (Búsqueda dinámica)
+    # Si el usuario pide "btun-l", buscamos "btun-l". Si pide "falex", buscamos "falex".
+    if "barrido" in consulta_usuario.lower() or "algo" in consulta_usuario.lower():
+        query = 'search (index=main OR index=botsv3) | head 5'
+    else:
+        # Limpiamos la frase para quedarnos con la palabra clave (ej. "btun-l")
+        palabras = consulta_usuario.split()
+        equipo_buscado = palabras[-1] if len(palabras) > 0 else "falex"
+        query = f'search (index=main OR index=botsv3) "{equipo_buscado}" | head 5'
+
+    print(f"   -> [VISIÓN] Buscando en Splunk: {query}")
+    resultado_splunk = ejecutar_consulta_spl.run(query_spl=query)
+    
+    if "No se encontraron resultados" in resultado_splunk:
+        return "No hay alertas pendientes en Splunk para esa búsqueda."
+
+    # 2. Analiza lo encontrado con Ollama
+    print(f"   -> [VISIÓN] Alertas encontradas. Analizando...")
+    
+    prompt_analisis = config["prompts"]["analisis_splunk"].format(
+        resultado_splunk=resultado_splunk,
+        consulta_usuario=consulta_usuario
+    )
     
     try:
-        print("   -> [VISIÓN] Revisando Splunk...")
-        fetch_splunk_alerts.run()
-        
-        with open("data/splunk_alerts.json", "r", encoding="utf-8") as f:
-            alertas = json.load(f)
-            
-        print(f"   -> [VISIÓN] He leído {len(alertas)} alertas de Splunk.")
-        
-        resumen_alertas = ""
-        for a in alertas:
-            equipo_alerta = a.get('computerDnsName', 'Desconocido')
-            resumen_alertas += f"- Equipo: {equipo_alerta} | Título: {a.get('title', '')} | Descripción: {a.get('description', '')}\n"
-
-        prompt_analisis = f"""Eres V.I.S.I.O.N., el monitor del SOC.
-        
-        EL USUARIO PREGUNTA: "{consulta_usuario}"
-        
-        ESTAS SON LAS ALERTAS ACTUALES DE SPLUNK:
-        {resumen_alertas}
-        
-        INSTRUCCIONES:
-        1. Busca en las alertas algo que coincida con la pregunta del usuario (CVE, malware, zombie, etc.).
-        2. Si ENCUENTRAS algo, extrae el equipo y recomienda al agente (KAREN para CVE, FRIDAY para Malware).
-        3. Si NO ENCUENTRAS NADA, o si el usuario pide explícitamente un "barrido" o "reconocimiento", DEBES recomendar a EDITH para que haga Threat Hunting proactivo en el equipo 'falex' (o el que se mencione).
-        
-        Responde EXACTAMENTE en este formato:
-        EQUIPO: [Nombre del equipo afectado o 'falex' por defecto]
-        MOTIVO: [Breve explicación de lo que encontraste o por qué haces el barrido]
-        AGENTE: [FRIDAY, EDITH, KAREN o NADA]
-        """
-        
         response = client.chat.completions.create(
-            model="qwen2.5:3b",
+            model=config["model"],
             messages=[{"role": "user", "content": prompt_analisis}],
             temperature=0.0
         )
         
         respuesta_ollama = response.choices[0].message.content
-        
-        print("\n--- ANÁLISIS DE VISIÓN ---")
-        print(respuesta_ollama)
-        print("--------------------------\n")
+        print(f"\n--- ANÁLISIS DE VISIÓN ---\n{respuesta_ollama}\n--------------------------\n")
         
         decision = "NADA"
-        equipo_afectado = "falex" 
-        motivo = "Barrido de reconocimiento"
+        equipo_afectado = "desconocido"
+        motivo = "Análisis de alertas"
         
         for linea in respuesta_ollama.split("\n"):
             if "EQUIPO:" in linea.upper():
@@ -161,51 +130,34 @@ def vigilante_splunk(consulta_usuario: str = "¿Hay algo por ahí?"):
                 motivo = linea.split(":", 1)[1].strip()
             elif "AGENTE:" in linea.upper():
                 linea_upper = linea.upper()
-                if "KAREN" in linea_upper:
-                    decision = "KAREN"
-                elif "FRIDAY" in linea_upper:
-                    decision = "FRIDAY"
-                elif "EDITH" in linea_upper:
-                    decision = "EDITH"
+                if "KAREN" in linea_upper: decision = "KAREN"
+                elif "FRIDAY" in linea_upper: decision = "FRIDAY"
+                elif "EDITH" in linea_upper: decision = "EDITH"
                     
         if decision == "NADA":
-            print("👷 [JARVIS]: Entendido. No hay nada urgente, vuelvo a modo espera.")
+            print("👷 [JARVIS]: Entendido. No hay nada urgente.")
             return "No hay nada urgente en Splunk."
 
-        print(f"👷 [JARVIS]: Entendido. Visión me dice que el equipo es '{equipo_afectado}'.")
-        print(f"👷 [JARVIS]: Me encargo de activar a {decision}. Motivo: {motivo}")
+        print(f"👷 [JARVIS]: Activando a {decision} para '{equipo_afectado}'. Motivo: {motivo}")
         
-        # --- ENRUTAMIENTO CON RETURN ---
         if decision == "FRIDAY":
             from agents.friday import ejecutar_friday
             return ejecutar_friday(equipo_afectado, motivo)
-            
         elif decision == "EDITH":
             from agents.edith import ejecutar_edith
             return ejecutar_edith(equipo_afectado)
-            
         elif decision == "KAREN":
             from agents.karen import ejecutar_karen
             return ejecutar_karen(equipo_afectado)
             
-        else:
-            return f"Visión no reconoció la decisión: {decision}"
-            
     except Exception as e:
-        print(f"Error: {e}")
-        return f"Error en el SOC: {e}"
+        return f"Error en el análisis de Visión: {e}"
 
 # ==========================================
 # FUNCIÓN 3: CHAT CON ALERTAS (Consultas en Lenguaje Natural)
 # ==========================================
 def chatear_con_alertas(pregunta: str):
-    """Responde cualquier pregunta basada en las alertas de Splunk, sin activar agentes."""
-    import json
-    from openai import OpenAI
-    from datetime import datetime  # <-- IMPORTANTE
-    
     print(f"💬 [VISIÓN CHAT] Pregunta: {pregunta}")
-    
     print("   -> [VISIÓN] Buscando alertas actuales en Splunk...")
     fetch_splunk_alerts.run()
     
@@ -213,65 +165,41 @@ def chatear_con_alertas(pregunta: str):
         with open("data/splunk_alerts.json", "r", encoding="utf-8") as f:
             alertas = json.load(f)
             
-        # 2. Preparamos el contexto con FECHAS AMIGABLES
         contexto = ""
         for a in alertas:
             fecha_raw = a.get('alertCreationTime', a.get('firstEventTime', ''))
-            
-            # Convertimos la fecha técnica a un formato legible
-            # Convertimos la fecha técnica a un formato legible
             fecha_amigable = "Fecha desconocida"
             if fecha_raw:
                 try:
                     fecha_dt = datetime.strptime(fecha_raw[:10], "%Y-%m-%d")
-                    # Formato: "04/11/2026" (Más fácil de leer para el LLM)
                     fecha_amigable = fecha_dt.strftime("%d/%m/%Y") 
                 except:
                     fecha_amigable = fecha_raw
-                    
             contexto += f"- Título: {a.get('title', '')} | Equipo: {a.get('computerDnsName', '')} | Gravedad: {a.get('severity', '')} | Fecha: {fecha_amigable}\n"
             
-        # 3. Leemos la configuración
-        config_vision = cargar_config()
-        personalidad = config_vision.get("backstory", "Eres un analista del SOC.")
-        instrucciones_chat = config_vision.get("prompt_chat", "Responde la pregunta basándote en las alertas.")
+        prompt = f"""{config['backstory']}
         
-        # 4. Construimos el prompt
-        prompt = f"""{personalidad}
+        PREGUNTA: {pregunta}
         
-        PREGUNTA DEL USUARIO: {pregunta}
-        
-        ALERTAS DISPONIBLES (Título | Equipo | Gravedad | Fecha):
+        ALERTAS:
         {contexto}
         
-        INSTRUCCIONES EXTRA PARA FECHAS:
-        - Si el usuario pregunta por una fecha, fíjate en el campo "Fecha" o en el formato YYYY-MM-DD.
-        - Si el usuario dice "noviembre", busca en las fechas que digan "November" o "11".
-        
-        INSTRUCCIONES GENERALES:
-        {instrucciones_chat}
+        INSTRUCCIONES EXTRA:
+        {config['prompts']['chat_alertas']}
         """
         
-        # 5. Le pedimos a Ollama que responda
-        client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")
-        
         response = client.chat.completions.create(
-            model="qwen2.5:3b",
+            model=config["model"],
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1
         )
         
         respuesta = response.choices[0].message.content.strip()
         
-        # 🚨 FILTRO DE SEGURIDAD
-        if not respuesta or respuesta == "-" or respuesta == "*" or respuesta == "-\n":
+        if not respuesta or respuesta in ["-", "*", "-\n"]:
             return "No hay alertas que coincidan con esa búsqueda."
             
-        respuesta = respuesta.replace("-\n", "").strip()
-        if not respuesta:
-            return "No hay alertas que coincidan con esa búsqueda."
-            
-        return respuesta
+        return respuesta.replace("-\n", "").strip()
         
     except Exception as e:
         return f"Error al consultar alertas: {e}"

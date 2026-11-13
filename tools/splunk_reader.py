@@ -9,31 +9,14 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 @tool("Obtener Alertas Nuevas de Splunk")
 def fetch_splunk_alerts() -> str:
-    """Conecta a Splunk, descarga las últimas alertas de Defender y las guarda en data/splunk_alerts.json."""
-    load_dotenv()  # Cargamos aquí para que los tests puedan sobreescribir
-    print("   -> [Splunk] Buscando alertas en Oracle...")
+    """Conecta a Splunk, descarga alertas de Defender o de BOTS v3 y las guarda en data/splunk_alerts.json."""
+    load_dotenv()
+    print("   -> [Splunk] Buscando alertas en el servidor...")
 
     splunk_host = os.getenv("SPLUNK_HOST")
     splunk_port = os.getenv("SPLUNK_REST_PORT", "8089")
     splunk_user = os.getenv("SPLUNK_USER", "admin")
     splunk_pass = os.getenv("SPLUNK_PASS")
-
-    # --- MODO DEMO (colocado DENTRO de la función, no antes de la def) ---
-    if (splunk_host and splunk_host.endswith("demo")) or splunk_pass == "demo":
-        print("   -> [DEMO MODE] Simulando alertas de Splunk...")
-        demo_alerts = [
-            {
-                "id": "demo-alert-001",
-                "computerDnsName": "falex",
-                "title": "Ransomware detected",
-                "description": "Proceso sospechoso detectado en falex",
-            }
-        ]
-        os.makedirs("data", exist_ok=True)
-        with open("data/splunk_alerts.json", "w", encoding="utf-8") as f:
-            json.dump(demo_alerts, f, indent=4)
-        return "Demo: 1 alerta simulada generada."
-    # --- FIN MODO DEMO ---
 
     if not splunk_host or not splunk_pass:
         return "Error: Faltan credenciales de Splunk en el .env"
@@ -42,8 +25,13 @@ def fetch_splunk_alerts() -> str:
         splunk_host = f"https://{splunk_host}"
 
     url = f"{splunk_host}:{splunk_port}/services/search/jobs/export"
+    
+    # 🚨 CONSULTA MODIFICADA: Buscamos en BOTS v3 o en Defender
+    # Intentamos traer eventos de los últimos 7 días en cualquier índice
+    query = 'search (index=botsv3 OR index=main) | head 5'
+    
     data = {
-        "search": 'search index=* sourcetype="ms:defender:atp:alerts" | head 10',
+        "search": query,
         "output_mode": "json",
         "earliest_time": "-7d",
         "latest_time": "now",
@@ -60,14 +48,31 @@ def fetch_splunk_alerts() -> str:
                 continue
             obj = json.loads(line)
             if "result" in obj:
+                # Intentamos parsear el JSON del resultado
                 try:
-                    alerts.append(json.loads(obj["result"].get("_raw", "{}")))
+                    raw_data = obj["result"].get("_raw", "{}")
+                    # Si es un JSON válido, lo agregamos
+                    if raw_data.strip().startswith("{"):
+                        alerts.append(json.loads(raw_data))
+                    else:
+                        # Si es texto plano (como los logs de BOTS v3), lo guardamos como un título
+                        alerts.append({
+                            "id": obj["result"].get("_cd", "unknown"),
+                            "title": raw_data[:100],
+                            "description": raw_data,
+                            "computerDnsName": obj["result"].get("host", "BOTS v3")
+                        })
                 except Exception:
                     pass
 
         os.makedirs("data", exist_ok=True)
         with open("data/splunk_alerts.json", "w", encoding="utf-8") as f:
             json.dump(alerts, f, indent=4)
-        return f"Se encontraron {len(alerts)} alertas. Guardadas en data/splunk_alerts.json."
+        
+        if len(alerts) == 0:
+            return "No se encontraron eventos en los últimos 7 días."
+            
+        return f"Se encontraron {len(alerts)} eventos. Guardados en data/splunk_alerts.json."
+        
     except Exception as e:
         return f"Error conectando a Splunk: {e}"

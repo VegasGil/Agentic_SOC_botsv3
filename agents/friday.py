@@ -1,36 +1,66 @@
 import os
+import json
 from crewai import Agent, LLM
 from crewai.knowledge.source.text_file_knowledge_source import TextFileKnowledgeSource
 
-# Herramientas base
+# Herramientas
 from tools.kql_runner import run_and_analyze
 from tools.verdict_sender import send_verdict
-
-# Nuevas herramientas de Threat Intelligence
 from tools.virustotal_tool import consultar_virustotal
 from tools.phishing_tool import detectar_phishing
+from tools.splunk_verdict_reader import ejecutar_consulta_spl  # 🚨 Nueva herramienta (Switch)
 
-llm = LLM(model="ollama_chat/qwen2.5:3b", base_url="http://localhost:11434", temperature=0.1)
+# 1. CARGAR LA CONFIGURACIÓN (JSON)
+def cargar_config_friday():
+    ruta = os.path.join("config", "friday.json")
+    try:
+        with open(ruta, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error cargando config de F.R.I.D.A.Y.: {e}")
+        return {
+            "role": "Especialista DFIR",
+            "goal": "Investigar alertas.",
+            "backstory": "Eres F.R.I.D.A.Y.",
+            "model": "ollama_chat/qwen2.5:3b",
+            "temperature": 0.1,
+            "max_iter": 5
+        }
 
-# 1. CREAS LA FUENTE DE CONOCIMIENTO
+config = cargar_config_friday()
+
+# 2. INICIALIZAR EL LLM CON LOS DATOS DEL JSON
+llm = LLM(
+    model=config["model"], 
+    base_url="http://localhost:11434", 
+    temperature=config["temperature"]
+)
+
+# 3. CREAR LA FUENTE DE CONOCIMIENTO
 knowledge_friday = TextFileKnowledgeSource(
     file_paths=["friday/test_rag_friday.txt"] 
 )
 
-# 2. DEFINIMOS EL AGENTE CON LAS NUEVAS HERRAMIENTAS
+# 4. DEFINIR EL AGENTE LEYENDO EL JSON
 friday = Agent(
-    role="Especialista DFIR",
-    goal="Investigar alertas ejecutando playbooks KQL en Microsoft Defender, consultar Threat Intel (VirusTotal/Phishing) y redactar informes.",
-    backstory="Eres F.R.I.D.A.Y., una IA forense experta. Sabes usar KQL para encontrar el origen de un ataque. También puedes consultar la reputación de IPs en VirusTotal y detectar dominios de Phishing.",
-    tools=[run_and_analyze, send_verdict, consultar_virustotal, detectar_phishing], # <-- HERRAMIENTAS AÑADIDAS
+    role=config["role"],
+    goal=config["goal"],
+    backstory=config["backstory"], # <-- Aquí lee la historia que menciona Splunk
+    tools=[
+        run_and_analyze, 
+        send_verdict, 
+        consultar_virustotal, 
+        detectar_phishing,
+        ejecutar_consulta_spl # <-- Aquí le entregamos la herramienta física
+    ],
     llm=llm,
     verbose=True,
-    max_iter=5,
+    max_iter=config["max_iter"],
     knowledge_sources=[knowledge_friday]
 )
 
 # ==========================================
-# FUNCIONES (Tu código original intacto)
+# FUNCIONES ORIGINALES (Intactas)
 # ==========================================
 
 def ejecutar_friday(equipo: str, incidente: str):

@@ -1,8 +1,25 @@
 {
-  "role": "Analista de Datos L3",
-  "goal": "Responder preguntas sobre alertas y evidencia forense de forma clara y concisa.",
-  "backstory": "Eres un analista de nivel 3 experto en leer telemetría y explicar incidentes.",
-  "system_prompt": "Eres un Analista de Ciberseguridad Senior. Tu trabajo es leer los datos que te proporciono y responder. NUNCA digas 'no tengo información' si los datos están a continuación. Responde de forma clara y técnica.",
-  "prompt_defender": "Eres un transcriptor de datos. Tu única tarea es leer el TEXTO de abajo y extraer los comandos exactos que aparecen.\n\nTEXTO:\n{datos_defender}\n\nPREGUNTA DEL USUARIO: \"{entrada}\"\n\nINSTRUCCIONES:\n- Simplemente copia y pega los comandos que aparecen en el TEXTO.\n- NO añadas frases como 'No se encontraron procesos'.",
-  "prompt_splunk": "Eres un analista. Aquí tienes las alertas de Splunk:\n\n{resumen_splunk}\n\nBasándote en estas alertas, responde a: \"{entrada}\"."
+  "system_prompt": "Eres un analista de ciberseguridad de Nivel 3 (L3). Tu trabajo es investigar en Splunk, leer los reportes de los agentes y responder de forma concisa.",
+  "welcome_message": "🤖 [L3 CHAT] Analista de Datos L3 en línea.\n💡 Tip: Escribe 'falexis' para el menú, o pídeme investigar una IP/URL o ver informes.",
+  "menu_agentes": {
+    "title": "\n🤖 [L3 CHAT] Menú de agentes:",
+    "options": {
+      "1": "F.R.I.D.A.Y. (DFIR) | 2. E.D.I.T.H. (Hunting) | 3. K.A.R.E.N. (RBVM)",
+      "2": "4. V.I.S.I.O.N. (Triaje) | 5. TODOS | 6. ASPM (Código) | 7. RBVM (Infra)"
+    }
+  },
+  "palabras_clave": {
+    "indices": ["que indices", "que indices tienes", "indices configurados"],
+    "informes": ["informe", "veredicto", "verdict", "reporte", "busca", "muestra", "dame"],
+    "defender": ["defender", "evidencia", "comando", "proceso", "xmrig"],
+    "aspm": ["aspm"],
+    "rbvm": ["rbvm"],
+    "menu": ["falexis", "ejecutar"]
+  },
+  "prompts": {
+    "resumen_datos": "Eres un analista. Splunk devolvió estos resultados:\n{resultado_splunk}\n\nResume la información en 2 frases y dime qué alerta es la más importante.",
+    "sin_datos": "El usuario preguntó: \"{entrada}\"\nSplunk realizó la búsqueda y NO encontró ningún resultado.\n\nComo analista de seguridad, responde en 2 frases qué significa esto. ¿Es un falso positivo? ¿Significa que el sistema está a salvo o que los logs no se están recolectando?",
+    "defender": "El usuario preguntó: \"{entrada}\"\n\nEvidencia de Defender:\n{datos_defender}\n\nAnaliza esta evidencia forense.",
+    "splunk_general": "El usuario preguntó: \"{entrada}\"\n\nAlertas recientes:\n{resumen_splunk}\n\nResponde basándote en estas alertas."
+  }
 }

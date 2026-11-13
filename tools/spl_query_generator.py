@@ -20,7 +20,7 @@ def generar_consulta_spl(pregunta: str) -> str:
             default_index = config.get("default_index", "main")
             indices_disponibles = ", ".join([idx["name"] for idx in config.get("available_indexes", [])])
     except Exception as e:
-        print(f"   ⚠️ [Config] No se pudo leer splunk_config.yaml: {e}")
+        print(f"   [Config] No se pudo leer splunk_config.yaml: {e}")
         default_index = "main"
         indices_disponibles = "main"
 
@@ -33,7 +33,7 @@ def generar_consulta_spl(pregunta: str) -> str:
             ejemplos = f.read()
         print(f"   [RAG] Ejemplos cargados: {len(ejemplos)} chars")
     except Exception as e:
-        print(f"   [RAG] ⚠️ ERROR cargando ejemplos: {e}")
+        print(f"   [RAG] ERROR cargando ejemplos: {e}")
         ejemplos = "(No hay ejemplos cargados, usa consultas simples)"
     
     # ==========================================================
@@ -53,7 +53,10 @@ REGLAS ESTRICTAS:
 3. Si la pregunta menciona una fecha → usa el patrón con earliest/latest y el índice por defecto.
 4. NUNCA inventes campos como `_name`, `_internal.Host`, `table` que no estén en el catálogo.
 5. SIEMPRE cierra las comillas dobles que abras.
-6. Devuelve SOLO la consulta SPL, sin explicaciones ni markdown. NO uses backticks (`).
+6. Si buscas un `sourcetype` o un `host`, usa SIEMPRE la sintaxis `sourcetype="valor"` o `host="valor"`. NUNCA uses comillas sueltas para estos campos.
+7. Devuelve SOLO la consulta SPL, sin explicaciones ni markdown. NO uses backticks (`).
+8. Si buscas tráfico de red (HTTP, DNS), usa SIEMPRE el operador OR. Ejemplo: `sourcetype="stream:http" OR sourcetype="stream:dns"`. NUNCA pongas el mismo campo dos veces.
+9. Si la pregunta menciona el equipo "btun-l" o palabras como "BOTS", usa SIEMPRE `index=botsv3`.
 
 PREGUNTA DEL USUARIO: "{pregunta}"
 
@@ -106,12 +109,14 @@ CONSULTA SPL:"""
             m = re.search(r'"([^"]+)"', spl_query)
             if m:
                 spl_query = f'search index={default_index} "{m.group(1)}"'
-
+                
         # ==========================================================
-        # 7. TRUCO SENIOR: Convertir campos específicos a texto general
+        # 7. TRUCO SENIOR: Corregir comillas en campos (En lugar de borrarlos)
         # ==========================================================
-        spl_query = re.sub(r'\w+="([^"]+)"', r'"\1"', spl_query)
-        spl_query = re.sub(r"\w+='([^']+)'", r'"\1"', spl_query)
+        # Si Ollama escribió "host" "btun-l", lo convertimos a host="btun-l"
+        spl_query = re.sub(r'"sourcetype"\s+"([^"]+)"', r'sourcetype="\1"', spl_query)
+        spl_query = re.sub(r'"host"\s+"([^"]+)"', r'host="\1"', spl_query)
+        spl_query = re.sub(r'"index"\s+"([^"]+)"', r'index="\1"', spl_query)
         
         # Aseguramos que siempre tenga un límite (head)
         if "| head" not in spl_query:

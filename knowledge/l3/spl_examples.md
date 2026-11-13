@@ -77,3 +77,26 @@
 - "Busca peticiones web sospechosas en BOTS" | `search index=botsv3 sourcetype="stream:http" | head 50`
 - "Busca ataques de fuerza bruta en BOTS" | `search index=botsv3 "failed password" | head 50`
 - "Busca el ataque a Apache Struts" | `search index=botsv3 "struts" | head 50`
+
+### Buscar Evidencia Cruda (Logs completos)
+- "Investigame la alerta del host btun-l" | `search index=botsv3 host="btun-l" | head 50`
+- "Dame la evidencia del sourcetype script:installedapps" | `search index=botsv3 sourcetype="script:installedapps" | head 50`
+- "Investiga el evento de script:installedapps en btun-l" | `search index=botsv3 host="btun-l" sourcetype="script:installedapps" | head 50`
+
+### Investigar Red y Usuarios (BOTS v3)
+- "Dame el tráfico de red de btun-l" | `search index=botsv3 host="btun-l" sourcetype="stream:http" | head 50`
+- "Dame los logs de red de btun-l" | `search index=botsv3 host="btun-l" (sourcetype="stream:http" OR sourcetype="stream:dns") | head 50`
+- "Dame los eventos de inicio de sesión de btun-l" | `search index=botsv3 host="btun-l" EventCode=4624 | head 50`
+
+### Tráfico de Red (BOTS v3)
+- "Busca el tráfico HTTP y DNS de btun-l" | `search index=botsv3 host="btun-l" (sourcetype="stream:http" OR sourcetype="stream:dns") | table src_ip, dest_ip, query | head 50`
+- "Busca inicios de sesión en btun-l" | `search index=botsv3 host="btun-l" EventCode=4624 | head 50`
+
+### Análisis Local (Sin consultar Splunk)
+- "Analiza la evidencia del archivo data/evidencia_XXX.json"
+- "Basado en la evidencia guardada, dime los usuarios y las IPs"
+
+### Ver Veredictos de los Agentes (Guardados por HEC)
+- "Dame los veredictos de los agentes" | `search index=main sourcetype="nirvana:secops:verdict" | head 50`
+- "Dame los reportes de F.R.I.D.A.Y." | `search index=main sourcetype="nirvana:secops:verdict" source_agent="F.R.I.D.A.Y." | head 50`
+- "Dame los reportes de E.D.I.T.H." | `search index=main sourcetype="nirvana:secops:verdict" source_agent="E.D.I.T.H." | head 50`
