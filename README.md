@@ -12,53 +12,20 @@
 > 🎥 *(Próximamente)*
 
 ---
+# 🛡️ Agentic-SOC (BOTS v3 Edition)
 
-## 🏗️ Arquitectura del Flujo (El Ecosistema)
+Sistema de ciberseguridad defensiva (SOC) Multi-Capa impulsado por Inteligencia Artificial y agentes autónomos. 
 
-El sistema está diseñado bajo una arquitectura de microservicios para IA, donde el orquestador delega el trabajo pesado a agentes especializados.
+## 🚀 Características Principales
+- **Arquitectura Multi-Agente:** F.R.I.D.A.Y. (DFIR), E.D.I.T.H. (Threat Hunting), K.A.R.E.N. (RBVM) y V.I.S.I.O.N. (Triaje).
+- **RAG (Few-Shot) para Splunk:** Traducción de Lenguaje Natural a SPL (Splunk Processing Language) sin alucinaciones, validado con el dataset real **Splunk BOTS v3** (1.9M de eventos).
+- **Threat Intel:** Integración nativa con VirusTotal y PhishDestroy.
+- **Observabilidad y Persistencia:** Envío de veredictos en tiempo real vía HEC (HTTP Event Collector) a Splunk.
+- **CI/CD:** 21 tests automatizados pasando en GitHub Actions.
 
-```text
-[ Splunk SIEM / Alertas ]
-         │
-         ▼ (Lectura de Alertas)
-┌─────────────────────────────┐
-│ J.A.R.V.I.S. (Orquestador)  ├──────► [ Slack API ] (Notificación)
-└──────────────┬──────────────┘
-               │
-               ▼ (Triaje inicial)
-┌─────────────────────────────┐
-│ V.I.S.I.O.N. (Analista)     │
-└──────┬──────┬───────┬───────┘
-       │      │       │
-       │      │       └───────► [ Escalado a Humano ] (Desconocido / Complejo)
-       │      │
-       │      └───────────────► K.A.R.E.N. (Auditoría Código) ──┐
-       │                      E.D.I.T.H. (Auditoría Red)    ──┼──► [ Microsoft Defender ] ──► ( Evidencia: /data )
-       └──────────────────────► F.R.I.D.A.Y. (Incidente DFIR) ──┘                                      │
-                                                                                                    ▼
-                                                                                            [ Ollama (Local) ]
-                                                                                         (Análisis y EPSS / KEV)
+## 🛠️ Tecnologías
+Python, CrewAI, Ollama (qwen2.5:3b), Splunk Enterprise, Microsoft Defender API, Docker.
 
-
-## 🤖 Los Agentes (El Equipo)
-
-1. **J.A.R.V.I.S. (El Orquestador)**  
-   Es el director del SOC. Se encarga de leer las alertas entrantes de Splunk, coordinar al agente de triaje (Visión) y llamar al especialista adecuado (F.R.I.D.A.Y., E.D.I.T.H. o K.A.R.E.N.) dependiendo de la naturaleza del incidente.
-
-2. **V.I.S.I.O.N. (Analista de Triaje)**  
-   El primer filtro. Lee la alerta cruda y decide, basándose en el contexto, qué agente debe investigar. Si no reconoce la amenaza, la escala a un humano.
-
-3. **F.R.I.D.A.Y. (Especialista DFIR)**  
-   Rápida y resolutiva. Es la encargada de los Incidentes (DFIR). Cuando Visión detecta Malware o Ransomware, Friday se conecta a Microsoft Defender, ejecuta playbooks KQL (búsqueda de logins, procesos, conexiones de red), guarda la evidencia y redacta el informe forense.
-
-4. **E.D.I.T.H. (Cazador de Amenazas)**  
-   Encuentra lo que otros no ven. Se encarga del Threat Hunting proactivo. Audita la infraestructura en busca de "Equipos Zombie" (máquinas encendidas sin uso humano) o comportamientos anómalos, sin esperar a que salte una alarma.
-
-5. **K.A.R.E.N. (Gestora de Vulnerabilidades y ASPM)**  
-   Analiza el entorno y el código. Es la experta en RBVM (Risk-Based Vulnerability Management). Busca CVEs en los endpoints (Defender) y en el código (Trivy/ASPM). Cruza los resultados con las bases de datos de EPSS (probabilidad de explotación) y CISA KEV (explotación activa) para priorizar qué parchear primero. Se actualiza automáticamente cada 24h.
-
-6. **D.E.T.E.C.T.O.R. (Traductor Sigma)**  
-   El ingeniero de detección. Convierte reglas universales Sigma (YAML) en consultas KQL nativas para Defender, garantizando la portabilidad del código.
 
 ---
 

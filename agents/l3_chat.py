@@ -26,9 +26,15 @@ def iniciar_l3_chat():
     print("💡 Tip: Escribe 'falexis' para el menú, o pídeme investigar una IP/URL o ver informes.")
     
     print("\n   [Sistema] Buscando alertas en Splunk...")
-    fetch_splunk_alerts.run()
-    with open("data/splunk_alerts.json", "r", encoding="utf-8") as f:
-        alertas = json.load(f)
+    
+    # 🚨 FIX: Manejo de errores si el archivo no existe
+    try:
+        fetch_splunk_alerts.run()
+        with open("data/splunk_alerts.json", "r", encoding="utf-8") as f:
+            alertas = json.load(f)
+    except Exception as e:
+        print(f"   ⚠️ [Aviso] No se pudieron cargar las alertas iniciales de Splunk: {e}")
+        alertas = [] # Si falla, empezamos con lista vacía para que no colapse
     
     resumen_splunk = ""
     for i, a in enumerate(alertas, 1):

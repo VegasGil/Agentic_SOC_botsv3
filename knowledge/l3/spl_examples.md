@@ -69,3 +69,11 @@
 - "Busca la alerta Executable permission added to file" | `search index=main "Executable permission added to file" | head 50`
 - "Dame las alertas de CryptoMiner" | `search index=main "CryptoMiner" | head 50`
 - "Muestra las alertas de EICAR" | `search index=main "EICAR" | head 50`
+
+### botv3
+
+### Búsqueda en el Dataset BOTS v3 (Splunk Enterprise - Puerto 8001)
+- "Busca PowerShell sospechoso en BOTS" | `search index=botsv3 sourcetype="xmlwineventlog" "powershell" | head 50`
+- "Busca peticiones web sospechosas en BOTS" | `search index=botsv3 sourcetype="stream:http" | head 50`
+- "Busca ataques de fuerza bruta en BOTS" | `search index=botsv3 "failed password" | head 50`
+- "Busca el ataque a Apache Struts" | `search index=botsv3 "struts" | head 50`
